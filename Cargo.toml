@@ -6,6 +6,8 @@ edition = "2024"
 [dependencies]
 anyhow = "1.0.99"
 clap = { version = "4.5.46", features = ["derive"] }
+dotenvy = "0.15.7"
 git2 = "0.20.2"
+qdrant-client = "1.15.0"
 rig-core = "0.18.2"
 tokio = { version = "1.47.1", features = ["full"] }

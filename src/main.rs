@@ -4,6 +4,7 @@ use qdrant_client::Qdrant;
 mod ingest;
 
 pub const TEST_REPO_URL: &str = "https://github.com/ayoubbuoya/orchestra-rs.git";
+pub const ALLOWED_EXTS: &[&str] = &["rs", "ts", "md", "sol", "js", "txt", "json", "toml"];
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -23,7 +24,7 @@ async fn main() -> Result<()> {
 
     dbg!(collections_list);
 
-    ingest::fetch_repo(TEST_REPO_URL).await?;
+    ingest::ingest_repo(TEST_REPO_URL, &qdrant_client).await?;
 
     Ok(())
 }

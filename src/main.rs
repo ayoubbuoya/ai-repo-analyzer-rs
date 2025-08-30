@@ -1,6 +1,11 @@
 use anyhow::Result;
 use qdrant_client::Qdrant;
+use rig::{
+    client::{EmbeddingsClient, ProviderClient},
+    providers::gemini,
+};
 
+mod agent;
 mod ingest;
 
 pub const TEST_REPO_URL: &str = "https://github.com/ayoubbuoya/orchestra-rs.git";
@@ -24,7 +29,17 @@ async fn main() -> Result<()> {
 
     dbg!(collections_list);
 
-    ingest::ingest_repo(TEST_REPO_URL, &qdrant_client).await?;
+    let ai_client = gemini::Client::from_env();
+
+    // let embedding_model = ai_client
+    //     .embeddings(gemini::embedding::EMBEDDING_001)
+    //     .build()
+    //     .await?;
+
+    let embedding_model =
+        gemini::embedding::EmbeddingModel::new(ai_client, gemini::embedding::EMBEDDING_001, None);
+
+    ingest::ingest_repo(TEST_REPO_URL, &qdrant_client, &embedding_model).await?;
 
     Ok(())
 }

@@ -1,8 +1,9 @@
 use anyhow::Result;
 use qdrant_client::Qdrant;
 use rig::{
-    client::{EmbeddingsClient, ProviderClient},
-    providers::gemini,
+    client::{CompletionClient, EmbeddingsClient, ProviderClient},
+    completion::Prompt,
+    providers::gemini::{self, completion::CompletionModel, completion::GEMINI_2_0_FLASH_LITE},
 };
 
 mod agent;
@@ -31,15 +32,30 @@ async fn main() -> Result<()> {
 
     let ai_client = gemini::Client::from_env();
 
-    // let embedding_model = ai_client
-    //     .embeddings(gemini::embedding::EMBEDDING_001)
-    //     .build()
-    //     .await?;
+    // let embedding_model =
+    //     gemini::embedding::EmbeddingModel::new(ai_client, gemini::embedding::EMBEDDING_001, None);
 
-    let embedding_model =
-        gemini::embedding::EmbeddingModel::new(ai_client, gemini::embedding::EMBEDDING_001, None);
+    // ingest::ingest_repo(TEST_REPO_URL, &qdrant_client, &embedding_model).await?;
 
-    ingest::ingest_repo(TEST_REPO_URL, &qdrant_client, &embedding_model).await?;
+    let ai_agent = ai_client.agent(
+        GEMINI_2_0_FLASH_LITE
+    ).preamble("You are AN AI agent that specialize in alayzing public github repo.
+     Your primary job is take the github repo link from the user and read its full codebase then generate a full explainer about this repo. Include mermaid diagrams in your explanation for better explainning the architecture. Return only thye response in markdown that i will later write to md file")
+     .temperature(0.0)
+     .build();
+
+    println!("AI agent built successfully");
+
+    let repo_explain_prompt = format!(
+        "Analyze the following GitHub repository and provide a detailed explanation of its structure and functionality: {TEST_REPO_URL}."
+    );
+
+    let ai_resp = ai_agent.prompt(repo_explain_prompt).await?;
+
+    println!("{:?}", ai_resp);
+
+    // store response in a markdown file
+    std::fs::write("repo_explanation.md", ai_resp)?;
 
     Ok(())
 }

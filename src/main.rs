@@ -6,10 +6,7 @@ mod utils;
 
 use anyhow::Result;
 use log::{error, info, warn};
-use rig::{
-    client::{ProviderClient, completion::CompletionClientDyn},
-    providers::gemini,
-};
+use rig::{client::ProviderClient, completion::Prompt, providers::gemini};
 
 use crate::{analyzers::repo::RepositoryAnalyzer, types::RepositoryMetadata};
 
@@ -91,17 +88,73 @@ async fn main() -> Result<()> {
     // Create analyzer
     let analyzer = RepositoryAnalyzer::new(github_token, None);
 
-    // INitialize a gemini AI agent using rig core
+    // Initialize a gemini AI agent using rig core
     let ai_client = gemini::Client::from_env();
     let ai_agent = ai_client
-        .agent("").temperature(0.0)
-        .preamble("You're an expert software engineer and code analyst. Provide concise and accurate answers based on the provided context. You'll be given information about a code repository, including its structure, files, and content. Use this information to Generate a full technical dev report on the repository, including its purpose, main features, technologies used, and potential improvements. If you don't have enough information, respond with 'Insufficient data to generate a report.'")
+        .agent("gemini-2.5-flash").temperature(0.0)
+        .preamble("You are an expert software engineer and technical analyst specializing in code repository analysis. You will be provided with detailed analysis data about a GitHub repository in JSON format.
+
+Your task is to generate a comprehensive technical development report that includes:
+
+## Executive Summary
+- Brief overview of the project's purpose and main functionality
+- Key technologies and architecture highlights
+- Current development status and maturity level
+
+## Technical Architecture
+- Primary programming languages and their usage distribution
+- Framework and library ecosystem
+- Project structure and organization patterns
+- Build system and deployment configurations
+
+## Code Quality Assessment
+- Code metrics analysis (lines of code, complexity, file organization, code quality, duplication, following best practices)
+- Security considerations and potential vulnerabilities
+- Documentation completeness and quality
+- Testing coverage and framework usage
+
+## Development Activity
+- Git history analysis (commit frequency, contributor engagement)
+- Recent development trends and focus areas
+- Release management and versioning strategy
+
+## Strengths and Opportunities
+- Key strengths of the codebase
+- Potential areas for improvement
+- Technical debt assessment
+- Recommendations for future development
+
+## Risk Assessment
+- Security vulnerabilities or concerns
+- Outdated dependencies or compatibility issues
+- Maintenance challenges or scalability concerns
+
+Provide your analysis in a clear, professional format with specific examples from the data when relevant. Be concise but thorough, focusing on actionable insights that would help developers understand and improve the project.")
         .build();
 
     // Perform analysis
     match analyzer.analyze_repository(repo_url).await {
-        Ok(analysis) => {
+        Ok(mut analysis) => {
             info!("Analysis completed successfully!");
+
+            // Generate AI-powered technical report
+            info!("Generating AI-powered technical report...");
+            match serde_json::to_string_pretty(&analysis) {
+                Ok(analysis_json) => {
+                    match ai_agent.prompt(&format!("Please analyze this repository data and generate a comprehensive technical report:\n\n{}", analysis_json)).await {
+                        Ok(response) => {
+                            analysis.ai_insights = Some(response);
+                            info!("AI report generated successfully!");
+                        }
+                        Err(e) => {
+                            warn!("Failed to generate AI report: {}. Proceeding with standard analysis.", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!("Failed to serialize analysis for AI: {}. Proceeding with standard analysis.", e);
+                }
+            }
 
             // Export analysis
             let output = match output_format.as_str() {

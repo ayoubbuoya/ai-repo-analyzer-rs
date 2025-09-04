@@ -46,7 +46,6 @@ dependencies = [
  "clap",
  "encoding_rs",
  "env_logger",
- "futures",
  "git2",
  "ignore",
  "log",

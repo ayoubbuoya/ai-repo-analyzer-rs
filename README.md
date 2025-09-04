@@ -308,6 +308,7 @@ Languages: TypeScript (68.2%), JavaScript (15.4%), CSS (8.1%), HTML (4.3%)
 
 ### Core Dependencies
 
+- **`rig-core`**: Create for AI integration 
 - **`tokio`**: Asynchronous runtime for concurrent operations
 - **`reqwest`**: HTTP client for GitHub API integration
 - **`git2`**: Git repository manipulation and analysis

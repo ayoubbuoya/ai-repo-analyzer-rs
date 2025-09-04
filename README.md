@@ -168,6 +168,13 @@ graph TD
 
 ### Data Flow Architecture
 
+This diagram shows how data flows through the system:
+
+- **Input Sources**: GitHub URLs, authentication tokens, and configuration options
+- **External Data**: GitHub API responses and local repository clones
+- **Analysis Pipeline**: Sequential processing through various analysis modules
+- **Output Generation**: Multiple output formats and destinations
+
 ```mermaid
 graph LR
     subgraph "Input Sources"
@@ -233,6 +240,7 @@ graph LR
     JSON_EXPORT --> FILE_OUTPUT
     YAML_EXPORT --> FILE_OUTPUT
 ```
+
 ### Component Architecture
 
 The diagram above illustrates the layered architecture of the AI Repository Analyzer:
@@ -244,18 +252,10 @@ The diagram above illustrates the layered architecture of the AI Repository Anal
 - **AI Enhancement Layer**: Integrates AI capabilities for intelligent report generation
 - **Data Models Layer**: Core data structures and utility functions
 
-### Data Flow Architecture
-
-This diagram shows how data flows through the system:
-
-- **Input Sources**: GitHub URLs, authentication tokens, and configuration options
-- **External Data**: GitHub API responses and local repository clones
-- **Analysis Pipeline**: Sequential processing through various analysis modules
-- **Output Generation**: Multiple output formats and destinations
-
 ## 🚀 Usage
 
 ### Basic Usage
+
 ```bash
 # Analyze a public repository
 ./ai-repo-analyzer-rs https://github.com/owner/repo
@@ -265,7 +265,7 @@ This diagram shows how data flows through the system:
 
 # Export analysis to file
 ./ai-repo-analyzer-rs https://github.com/owner/repo --output json --output-file analysis.json
-````
+```
 
 ### Command Line Options
 

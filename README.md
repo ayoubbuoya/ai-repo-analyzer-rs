@@ -35,66 +35,51 @@ The AI Repository Analyzer performs a multi-dimensional analysis of GitHub repos
 
 The application follows a modular, layered architecture designed for maintainability and extensibility:
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    MAIN APPLICATION LAYER                   │
-│  ┌─────────────────────────────────────────────────────┐    │
-│  │                 RepositoryAnalyzer                   │    │
-│  │  - Orchestrates the entire analysis process         │    │
-│  │  - Coordinates between GitHub API and local Git     │    │
-│  │  - Manages analysis workflow and data aggregation   │    │
-│  └─────────────────────────────────────────────────────┘    │
-└─────────────────────────────────────────────────────────────┘
-                                   │
-                    ┌──────────────┼──────────────┐
-                    │              │              │
-          ┌─────────▼────────┐ ┌───▼──┐ ┌────────▼────────┐
-          │   ANALYZERS     │ │ GIT  │ │    GITHUB API    │
-          │   LAYER         │ │ LAYER│ │     LAYER       │
-          └─────────────────┘ └──────┘ └─────────────────┘
-                    │                    │              │
-          ┌─────────▼────────┐ ┌────────▼────────┐ ┌───▼──┐
-          │ Code Metrics     │ │ Git History     │ │ Repo  │
-          │ Analyzer         │ │ Analyzer        │ │ Meta- │
-          │                  │ │                  │ │ data  │
-          └─────────────────┘ └─────────────────┘ └──────┘
-                    │                    │              │
-          ┌─────────▼────────┐ ┌────────▼────────┐ ┌───▼──┐
-          │ File System      │ │ File Changes    │ │ Con- │
-          │ Analyzer         │ │ Tracking        │ │ trib- │
-          │                  │ │                  │ │ utors │
-          └─────────────────┘ └─────────────────┘ └──────┘
-                    │                    │              │
-          ┌─────────▼────────┐ ┌────────▼────────┐ ┌───▼──┐
-          │ Project Type     │ │ Commit Analysis │ │ Issues│
-          │ Detector         │ │                  │ │ &     │
-          │                  │ │                  │ │Releases│
-          └─────────────────┘ └─────────────────┘ └──────┘
-                    │                    │              │
-          ┌─────────▼────────┐ ┌────────▼────────┐ ┌───▼──┐
-          │ Security         │ │ Branch/Tag      │ │Topics │
-          │ Analyzer         │ │ Analysis        │ │& Lang-│
-          │                  │ │                  │ │uages  │
-          └─────────────────┘ └─────────────────┘ └──────┘
-                                   │
-                    ┌──────────────┼──────────────┐
-                    │              │              │
-          ┌─────────▼────────┐ ┌───▼──┐ ┌────────▼────────┐
-          │   DATA MODELS    │ │ UTILS│ │   EXTERNAL      │
-          │   LAYER          │ │ LAYER│ │   INTEGRATIONS  │
-          └─────────────────┘ └──────┘ └─────────────────┘
-                    │                    │              │
-          ┌─────────▼────────┐ ┌────────▼────────┐ ┌───▼──┐
-          │ Structured Data  │ │ URL Parsing     │ │ Git2 │
-          │ Models (types.rs)│ │ File Processing │ │ Crate │
-          │                  │ │ Text Analysis   │ │      │
-          └─────────────────┘ └─────────────────┘ └──────┘
-                    │                    │              │
-          ┌─────────▼────────┐ ┌────────▼────────┐ ┌───▼──┐
-          │ Repository-      │ │ GitHub URL      │ │ Req- │
-          │ Analysis         │ │ Validation      │ │ west │
-          │ Results          │ │                 │ │ HTTP │
-          └─────────────────┘ └─────────────────┘ └──────┘
+### Component Architecture
+
+```mermaid
+graph TB
+    subgraph "User Interface Layer"
+        CLI[CLI Interface<br/>main.rs]
+    end
+
+    subgraph "Analysis Orchestration Layer"
+        RA[RepositoryAnalyzer<br/>analyzers/repo.rs]
+    end
+
+    subgraph "Data Collection Layer"
+        GH[GitHubClient<br/>github.rs]
+        GM[GitManager<br/>git.rs]
+    end
+
+    subgraph "Analysis Modules Layer"
+        FSA[FileSystemAnalyzer<br/>analyzers/filesystem.rs]
+        CMA[CodeMetricsCalculator<br/>analyzers/code_metrics.rs]
+        PTD[ProjectTypeDetector<br/>analyzers/type_detector.rs]
+        SA[SecurityAnalyzer<br/>analyzers/security.rs]
+    end
+
+    subgraph "AI Enhancement Layer"
+        AI[AI Agent<br/>Gemini Integration]
+    end
+
+    subgraph "Data Models Layer"
+        DM[Data Models<br/>types.rs]
+        UT[Utilities<br/>utils.rs]
+    end
+
+    CLI --> RA
+    RA --> GH
+    RA --> GM
+    RA --> FSA
+    RA --> CMA
+    RA --> PTD
+    RA --> SA
+    CLI --> AI
+    RA --> DM
+    FSA --> UT
+    GH --> UT
+    GM --> UT
 ```
 
 ### Core Components
@@ -104,7 +89,7 @@ The application follows a modular, layered architecture designed for maintainabi
 // Command-line argument parsing
 // Authentication setup (GitHub token)
 // Analysis orchestration
-// Output formatting and export
+// AI integration and output formatting
 ```
 
 #### 2. **Repository Analyzer (`analyzers/repo.rs`)**
@@ -125,14 +110,22 @@ The central orchestrator that:
 - **`github.rs`**: GitHub API integration using `reqwest` for HTTP requests
 - **`utils.rs`**: Helper functions for URL parsing, file processing, and data manipulation
 
-#### 5. **Data Models (`types.rs`)**
+#### 5. **AI Enhancement Layer**
+- **Gemini Integration**: Uses Google's Gemini AI model to generate comprehensive technical reports
+- **Intelligent Analysis**: Provides AI-powered insights and recommendations
+- **Report Generation**: Creates professional technical documentation automatically
+
+#### 6. **Data Models (`types.rs`)**
 Comprehensive data structures for:
 - GitHub API responses (users, repositories, issues, releases)
 - Analysis results (code metrics, project info, security data)
 - File system representations
 - Git history data
+- AI-generated insights
 
 ## 🔄 Analysis Workflow
+
+The analysis process follows a comprehensive pipeline that combines traditional code analysis with AI-powered insights:
 
 ```mermaid
 graph TD
@@ -147,9 +140,103 @@ graph TD
     I --> J[Analyze configuration files]
     J --> K[Perform security assessment]
     K --> L[Generate analysis summary]
-    L --> M[Export results in JSON/YAML format]
-    M --> N[Display summary to user]
+    L --> M[Generate AI-powered technical report]
+    M --> N[Merge AI insights with analysis]
+    N --> O[Export results in JSON/YAML format]
+    O --> P[Display summary to user]
 ```
+
+**Key Features of the Workflow:**
+- **Parallel Processing**: GitHub API calls run concurrently for efficiency
+- **AI Enhancement**: Automated generation of comprehensive technical reports
+- **Flexible Output**: Support for both structured data and human-readable formats
+- **Error Resilience**: Graceful handling of API failures and missing data
+
+### Data Flow Architecture
+
+```mermaid
+graph LR
+    subgraph "Input Sources"
+        URL[GitHub URL]
+        TOKEN[GitHub Token<br/>Optional]
+        CONFIG[CLI Config]
+    end
+
+    subgraph "External Data"
+        GH_API[GitHub API<br/>Metadata, Contributors,<br/>Issues, Releases]
+        LOCAL_REPO[Local Git Repository<br/>Clone/Update]
+    end
+
+    subgraph "Analysis Pipeline"
+        PARSER[URL Parser]
+        FETCH[Data Fetcher]
+        CLONE[Repository Cloner]
+        FS_ANALYZE[File System Analysis]
+        GIT_ANALYZE[Git History Analysis]
+        METRICS[Code Metrics Calculation]
+        TYPE_DETECT[Project Type Detection]
+        SECURITY[Security Analysis]
+        AI_PROCESS[AI Enhancement]
+    end
+
+    subgraph "Output Generation"
+        SUMMARY[Analysis Summary]
+        JSON_EXPORT[JSON Export]
+        YAML_EXPORT[YAML Export]
+        FILE_OUTPUT[File Output]
+        STDOUT[Console Output]
+    end
+
+    URL --> PARSER
+    TOKEN --> FETCH
+    CONFIG --> FETCH
+
+    PARSER --> FETCH
+    FETCH --> GH_API
+    FETCH --> CLONE
+    CLONE --> LOCAL_REPO
+
+    LOCAL_REPO --> FS_ANALYZE
+    LOCAL_REPO --> GIT_ANALYZE
+
+    FS_ANALYZE --> METRICS
+    FS_ANALYZE --> TYPE_DETECT
+    FS_ANALYZE --> SECURITY
+
+    GIT_ANALYZE --> METRICS
+
+    METRICS --> SUMMARY
+    TYPE_DETECT --> SUMMARY
+    SECURITY --> SUMMARY
+    GH_API --> SUMMARY
+
+    SUMMARY --> AI_PROCESS
+    AI_PROCESS --> SUMMARY
+
+    SUMMARY --> JSON_EXPORT
+    SUMMARY --> YAML_EXPORT
+
+    JSON_EXPORT --> FILE_OUTPUT
+    YAML_EXPORT --> FILE_OUTPUT
+### Component Architecture
+
+The diagram above illustrates the layered architecture of the AI Repository Analyzer:
+
+- **User Interface Layer**: Handles command-line interaction and user input
+- **Analysis Orchestration Layer**: Central coordinator that manages the entire analysis workflow
+- **Data Collection Layer**: Interfaces with external data sources (GitHub API and local Git repositories)
+- **Analysis Modules Layer**: Specialized analyzers for different aspects of repository analysis
+- **AI Enhancement Layer**: Integrates AI capabilities for intelligent report generation
+- **Data Models Layer**: Core data structures and utility functions
+
+### Data Flow Architecture
+
+This diagram shows how data flows through the system:
+
+- **Input Sources**: GitHub URLs, authentication tokens, and configuration options
+- **External Data**: GitHub API responses and local repository clones
+- **Analysis Pipeline**: Sequential processing through various analysis modules
+- **Output Generation**: Multiple output formats and destinations
 
 ## 🚀 Usage
 

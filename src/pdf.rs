@@ -1,136 +1,147 @@
 use crate::types::RepositoryAnalysis;
 use anyhow::Result;
 use printpdf::*;
+use pulldown_cmark::{Parser, Event, Tag};
 use std::fs::File;
 use std::io::BufWriter;
 
+const PAGE_WIDTH_MM: f32 = 210.0;
+const PAGE_HEIGHT_MM: f32 = 297.0;
+const LEFT_MARGIN_MM: f32 = 15.0;
+const RIGHT_MARGIN_MM: f32 = 15.0;
+const TOP_MARGIN_MM: f32 = 20.0;
+const BOTTOM_MARGIN_MM: f32 = 20.0;
+
 pub fn generate_pdf_report(analysis: &RepositoryAnalysis, output_path: &str) -> Result<()> {
-    // Create a new PDF document
-    let (doc, page1, layer1) = PdfDocument::new(
-        format!("AI Repository Analysis Report - {}", analysis.metadata.name),
-        Mm(210.0), // A4 width
-        Mm(297.0), // A4 height
-        "Layer 1"
+    // Create document
+    let (mut doc, mut page, mut layer) = PdfDocument::new(
+        format!("AI Repository Analysis - {}", analysis.metadata.name),
+        Mm(PAGE_WIDTH_MM),
+        Mm(PAGE_HEIGHT_MM),
+        "Layer 1",
     );
 
-    let current_layer = doc.get_page(page1).get_layer(layer1);
+    // Fonts
+    let regular = doc.add_builtin_font(BuiltinFont::Helvetica)?;
+    let bold = doc.add_builtin_font(BuiltinFont::HelveticaBold)?;
 
-    // Load a font (we'll use a built-in font for simplicity)
-    let font = doc.add_builtin_font(BuiltinFont::Helvetica)?;
-    let bold_font = doc.add_builtin_font(BuiltinFont::HelveticaBold)?;
+    // Layout state
+    let mut cursor_y: f32 = PAGE_HEIGHT_MM - TOP_MARGIN_MM; // mm from bottom in printpdf uses Mm(y)
+    let line_height: f32 = 6.0; // mm
+    // let max_width_mm: f32 = PAGE_WIDTH_MM - LEFT_MARGIN_MM - RIGHT_MARGIN_MM;
 
-    // Set up text scale
-    let normal_scale = 12.0;
-    let title_scale = 18.0;
-    let header_scale = 14.0;
-
-    // Starting position
-    let mut y_position = 280.0; // Start from top
-    let left_margin = 20.0;
-    let line_height = 5.0;
+    // Helper to ensure space and create new page if needed
+    fn add_page_if_needed(doc: &mut printpdf::PdfDocumentReference, page: &mut printpdf::PdfPageIndex, layer: &mut printpdf::PdfLayerIndex, cursor_y: &mut f32, needed: f32) {
+        if *cursor_y - needed < BOTTOM_MARGIN_MM {
+            let (new_page, new_layer) = doc.add_page(Mm(PAGE_WIDTH_MM), Mm(PAGE_HEIGHT_MM), "Layer");
+            *page = new_page;
+            *layer = new_layer;
+            *cursor_y = PAGE_HEIGHT_MM - TOP_MARGIN_MM;
+        }
+    }
 
     // Title
-    current_layer.use_text(
+    add_page_if_needed(&mut doc, &mut page, &mut layer, &mut cursor_y, 10.0);
+    doc.get_page(page).get_layer(layer).use_text(
         format!("AI Repository Analysis Report"),
-        title_scale,
-        Mm(left_margin),
-        Mm(y_position),
-        &bold_font
+        18.0,
+        Mm(LEFT_MARGIN_MM),
+        Mm(cursor_y),
+        &bold,
     );
-    y_position -= line_height * 2.0;
+    cursor_y -= line_height * 1.5;
 
-    // Repository info
-    current_layer.use_text(
+    // Repo info
+    doc.get_page(page).get_layer(layer).use_text(
         format!("Repository: {}", analysis.metadata.full_name),
-        header_scale,
-        Mm(left_margin),
-        Mm(y_position),
-        &bold_font
+        12.0,
+        Mm(LEFT_MARGIN_MM),
+        Mm(cursor_y),
+        &bold,
     );
-    y_position -= line_height * 1.5;
+    cursor_y -= line_height;
 
-    current_layer.use_text(
+    doc.get_page(page).get_layer(layer).use_text(
         format!("Analyzed at: {}", analysis.analyzed_at.format("%Y-%m-%d %H:%M:%S UTC")),
-        normal_scale,
-        Mm(left_margin),
-        Mm(y_position),
-        &font
+        10.0,
+        Mm(LEFT_MARGIN_MM),
+        Mm(cursor_y),
+        &regular,
     );
-    y_position -= line_height * 1.5;
+    cursor_y -= line_height * 1.5;
 
-    // Analysis Summary
-    current_layer.use_text(
-        "Analysis Summary:",
-        header_scale,
-        Mm(left_margin),
-        Mm(y_position),
-        &bold_font
-    );
-    y_position -= line_height * 1.5;
-
-    // Split summary into lines and add to PDF
-    let summary_lines = split_text_into_lines(&analysis.analysis_summary, 80);
-    for line in summary_lines {
-        if y_position < 20.0 {
-            // If we're running out of space, we'd need to add a new page
-            // For simplicity, we'll truncate for now
-            current_layer.use_text(
-                "... (content truncated)",
-                normal_scale,
-                Mm(left_margin),
-                Mm(y_position),
-                &font
-            );
-            break;
-        }
-        current_layer.use_text(
-            line,
-            normal_scale,
-            Mm(left_margin),
-            Mm(y_position),
-            &font
-        );
-        y_position -= line_height;
+    // Analysis summary
+    doc.get_page(page).get_layer(layer).use_text("Analysis Summary:", 12.0, Mm(LEFT_MARGIN_MM), Mm(cursor_y), &bold);
+    cursor_y -= line_height;
+    for line in split_text_into_lines(&analysis.analysis_summary, 90) {
+        add_page_if_needed(&mut doc, &mut page, &mut layer, &mut cursor_y, line_height);
+        doc.get_page(page).get_layer(layer).use_text(&line, 10.0, Mm(LEFT_MARGIN_MM), Mm(cursor_y), &regular);
+        cursor_y -= line_height;
     }
 
-    // AI Insights (if present)
-    if let Some(ai_insights) = &analysis.ai_insights {
-        y_position -= line_height * 2.0; // Add some space
+    // AI insights: render markdown
+    if let Some(ai) = &analysis.ai_insights {
+    cursor_y -= line_height; // spacing
+    add_page_if_needed(&mut doc, &mut page, &mut layer, &mut cursor_y, line_height);
+    doc.get_page(page).get_layer(layer).use_text("AI-Generated Technical Report:", 12.0, Mm(LEFT_MARGIN_MM), Mm(cursor_y), &bold);
+    cursor_y -= line_height;
 
-        current_layer.use_text(
-            "AI-Generated Technical Report:",
-            header_scale,
-            Mm(left_margin),
-            Mm(y_position),
-            &bold_font
-        );
-        y_position -= line_height * 1.5;
+        // Parse markdown and render basic elements
+        let parser = Parser::new(ai);
+        let mut list_indent = 0usize;
 
-        // Split AI insights into lines
-        let insights_lines = split_text_into_lines(ai_insights, 80);
-        for line in insights_lines {
-            if y_position < 20.0 {
-                current_layer.use_text(
-                    "... (content truncated)",
-                    normal_scale,
-                    Mm(left_margin),
-                    Mm(y_position),
-                    &font
-                );
-                break;
+        for event in parser {
+            match event {
+                Event::Start(tag) => match tag {
+                    Tag::Heading(..) => {
+                        // reserve space for heading
+                        add_page_if_needed(&mut doc, &mut page, &mut layer, &mut cursor_y, line_height * 1.4);
+                        // next text events will be used as heading content; handled in Text event
+                    }
+                    Tag::List(_) => {
+                        list_indent += 1;
+                    }
+                    Tag::CodeBlock(_) => {
+                        add_page_if_needed(&mut doc, &mut page, &mut layer, &mut cursor_y, line_height);
+                    }
+                    _ => {}
+                },
+                Event::End(tag) => match tag {
+                    Tag::List(_) => {
+                        if list_indent > 0 { list_indent -= 1; }
+                        cursor_y -= line_height * 0.2;
+                    }
+                    _ => {}
+                },
+                Event::Text(text) => {
+                    // For simplicity, treat text as paragraphs; wrap and render
+                    for line in split_text_into_lines(&text, 90 - list_indent * 4) {
+                        add_page_if_needed(&mut doc, &mut page, &mut layer, &mut cursor_y, line_height);
+                        // indent for list items
+                        let indent_x = LEFT_MARGIN_MM + (list_indent as f32) * 5.0;
+                        doc.get_page(page).get_layer(layer).use_text(&line, 10.0, Mm(indent_x), Mm(cursor_y), &regular);
+                        cursor_y -= line_height;
+                    }
+                }
+                Event::Code(code) => {
+                    // inline code: render with monospace sized box
+                    add_page_if_needed(&mut doc, &mut page, &mut layer, &mut cursor_y, line_height);
+                    doc.get_page(page).get_layer(layer).use_text(&format!("`{}`", code), 10.0, Mm(LEFT_MARGIN_MM), Mm(cursor_y), &regular);
+                    cursor_y -= line_height;
+                }
+                Event::Html(_) | Event::FootnoteReference(_) | Event::SoftBreak => {
+                    // treat as space
+                    cursor_y -= line_height * 0.2;
+                }
+                Event::HardBreak => {
+                    cursor_y -= line_height;
+                }
+                _ => {}
             }
-            current_layer.use_text(
-                line,
-                normal_scale,
-                Mm(left_margin),
-                Mm(y_position),
-                &font
-            );
-            y_position -= line_height;
         }
     }
 
-    // Save the PDF
+    // Save
     doc.save(&mut BufWriter::new(File::create(output_path)?))?;
 
     Ok(())
@@ -138,36 +149,27 @@ pub fn generate_pdf_report(analysis: &RepositoryAnalysis, output_path: &str) -> 
 
 fn split_text_into_lines(text: &str, max_chars_per_line: usize) -> Vec<String> {
     let mut lines = Vec::new();
-    let mut current_line = String::new();
-
+    let mut current = String::new();
     for word in text.split_whitespace() {
-        if current_line.len() + word.len() + 1 > max_chars_per_line {
-            if !current_line.is_empty() {
-                lines.push(current_line);
-                current_line = String::new();
-            }
-            // If a single word is too long, split it
+        if current.len() + word.len() + 1 > max_chars_per_line {
+            if !current.is_empty() { lines.push(current.clone()); current.clear(); }
             if word.len() > max_chars_per_line {
-                let mut word_chars = word.chars().collect::<Vec<_>>();
-                while !word_chars.is_empty() {
-                    let take = std::cmp::min(max_chars_per_line, word_chars.len());
-                    let chunk: String = word_chars.drain(0..take).collect();
-                    lines.push(chunk);
+                // split long word
+                let mut w = word;
+                while w.len() > max_chars_per_line {
+                    let part = &w[0..max_chars_per_line];
+                    lines.push(part.to_string());
+                    w = &w[max_chars_per_line..];
                 }
+                if !w.is_empty() { current.push_str(w); }
             } else {
-                current_line = word.to_string();
+                current.push_str(word);
             }
         } else {
-            if !current_line.is_empty() {
-                current_line.push(' ');
-            }
-            current_line.push_str(word);
+            if !current.is_empty() { current.push(' '); }
+            current.push_str(word);
         }
     }
-
-    if !current_line.is_empty() {
-        lines.push(current_line);
-    }
-
+    if !current.is_empty() { lines.push(current); }
     lines
 }

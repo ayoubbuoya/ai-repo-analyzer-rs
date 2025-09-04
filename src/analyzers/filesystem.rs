@@ -1,4 +1,9 @@
-use std::{collections::HashMap, fs, io::Read, path::{Path, PathBuf}};
+use std::{
+    collections::HashMap,
+    fs,
+    io::Read,
+    path::{Path, PathBuf},
+};
 
 use anyhow::Result;
 use ignore::WalkBuilder;

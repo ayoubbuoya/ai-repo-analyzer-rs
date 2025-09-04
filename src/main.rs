@@ -6,6 +6,10 @@ mod utils;
 
 use anyhow::Result;
 use log::{error, info, warn};
+use rig::{
+    client::{ProviderClient, completion::CompletionClientDyn},
+    providers::gemini,
+};
 
 use crate::{analyzers::repo::RepositoryAnalyzer, types::RepositoryMetadata};
 
@@ -86,6 +90,13 @@ async fn main() -> Result<()> {
 
     // Create analyzer
     let analyzer = RepositoryAnalyzer::new(github_token, None);
+
+    // INitialize a gemini AI agent using rig core
+    let ai_client = gemini::Client::from_env();
+    let ai_agent = ai_client
+        .agent("").temperature(0.0)
+        .preamble("You're an expert software engineer and code analyst. Provide concise and accurate answers based on the provided context. You'll be given information about a code repository, including its structure, files, and content. Use this information to Generate a full technical dev report on the repository, including its purpose, main features, technologies used, and potential improvements. If you don't have enough information, respond with 'Insufficient data to generate a report.'")
+        .build();
 
     // Perform analysis
     match analyzer.analyze_repository(repo_url).await {
